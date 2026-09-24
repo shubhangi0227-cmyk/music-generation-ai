@@ -1,0 +1,4 @@
+data/processed/sequences.npy
+models/music_lstm.npz
+__pycache__/
+*.pyc

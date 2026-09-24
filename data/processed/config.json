@@ -1,0 +1,11 @@
+{
+  "vocab_size": 253,
+  "window_size": 64,
+  "steps_per_beat": 4,
+  "velocity_bins": 4,
+  "max_dur_steps": 16,
+  "num_sequences": 5638,
+  "pad_id": 0,
+  "sos_id": 1,
+  "eos_id": 2
+}
