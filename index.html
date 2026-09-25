@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Music Generation AI</title>
+<meta name="description" content="A single-layer LSTM, hand-built in NumPy, composing classical and jazz piano pieces.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎹</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #1a1013;
+    --bg-raised: #241820;
+    --ink: #f1e7d8;
+    --ink-dim: #b9a993;
+    --brass: #c99a44;
+    --brass-soft: rgba(201, 154, 68, 0.45);
+    --focus: #e3c77e;
+    --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+    --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  a { color: var(--brass); text-underline-offset: 3px; }
+  a:hover { color: var(--focus); }
+  a:focus-visible, audio:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 3px;
+  }
+
+  audio { accent-color: var(--brass); }
+
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: clamp(40px, 9vw, 88px) 24px 64px;
+  }
+
+  .hero { animation: rise 0.6s ease-out; }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero { animation: none; }
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: clamp(2.25rem, 6vw, 3.25rem);
+    line-height: 1.08;
+    margin: 0 0 18px;
+  }
+
+  .subhead {
+    font-size: 1.0625rem;
+    color: var(--ink-dim);
+    max-width: 46ch;
+    margin: 0 0 40px;
+  }
+
+  .feature {
+    background: var(--bg-raised);
+    border-left: 3px solid var(--brass);
+    border-radius: 6px;
+    padding: 22px 26px 26px;
+  }
+
+  .feature-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .num {
+    font-family: var(--font-display);
+    font-size: 1rem;
+    color: var(--brass);
+  }
+
+  .feature h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.375rem;
+    margin: 0;
+  }
+
+  audio { width: 100%; display: block; }
+
+  .caption {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink-dim);
+    margin: 10px 0 0;
+  }
+
+  .roll {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 40px;
+    margin: 48px 0;
+  }
+  .roll span {
+    flex: 1;
+    background: var(--brass-soft);
+    border-radius: 1px;
+    min-width: 2px;
+  }
+
+  section.tracklist h2,
+  section.how h2 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.375rem;
+    margin: 0 0 20px;
+  }
+
+  .tracklist ul {
+    list-style: none;
+    margin: 0 0 56px;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .tracklist li {
+    display: flex;
+    gap: 16px;
+  }
+
+  .tracklist .num {
+    padding-top: 3px;
+    flex-shrink: 0;
+    width: 1.5em;
+  }
+
+  .track-body { flex: 1; min-width: 0; }
+
+  .track-body h3 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 1.0625rem;
+    margin: 0 0 8px;
+  }
+
+  .how { margin-bottom: 56px; }
+
+  .pipeline {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--ink);
+    background: var(--bg-raised);
+    border-radius: 6px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    white-space: nowrap;
+    margin: 0 0 20px;
+  }
+
+  .facts {
+    margin: 0;
+    padding: 0 0 0 1.1em;
+    color: var(--ink-dim);
+    font-size: 0.9375rem;
+  }
+  .facts li { margin-bottom: 8px; }
+  .facts li:last-child { margin-bottom: 0; }
+
+  footer {
+    border-top: 1px solid rgba(241, 231, 216, 0.12);
+    padding-top: 24px;
+    font-size: 0.9375rem;
+    color: var(--ink-dim);
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+
+    <header class="hero">
+      <h1>Music Generation AI</h1>
+      <p class="subhead">
+        A single-layer LSTM, hand-built in NumPy, composing classical
+        and jazz piano pieces — no TensorFlow, no external MIDI libraries.
+      </p>
+
+      <section class="feature">
+        <div class="feature-head">
+          <span class="num">I</span>
+          <h2>Piece I</h2>
+        </div>
+        <audio controls preload="metadata" src="output/audio/generated_01.wav">
+          Your browser doesn't support the audio element.
+        </audio>
+        <p class="caption">sampled at temp 0.9, top-k 12</p>
+      </section>
+    </header>
+
+    <div class="roll" aria-hidden="true">
+      <span style="height:22%"></span><span style="height:35%"></span>
+      <span style="height:58%"></span><span style="height:44%"></span>
+      <span style="height:70%"></span><span style="height:85%"></span>
+      <span style="height:65%"></span><span style="height:50%"></span>
+      <span style="height:38%"></span><span style="height:60%"></span>
+      <span style="height:80%"></span><span style="height:95%"></span>
+      <span style="height:75%"></span><span style="height:55%"></span>
+      <span style="height:35%"></span><span style="height:45%"></span>
+      <span style="height:65%"></span><span style="height:50%"></span>
+      <span style="height:30%"></span><span style="height:40%"></span>
+    </div>
+
+    <section class="tracklist">
+      <h2>More pieces</h2>
+      <ul>
+        <li>
+          <span class="num">II</span>
+          <div class="track-body">
+            <h3>Piece II</h3>
+            <audio controls preload="metadata" src="output/audio/generated_02.wav"></audio>
+            <p class="caption">sampled at temp 0.9, top-k 12</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">III</span>
+          <div class="track-body">
+            <h3>Piece III</h3>
+            <audio controls preload="metadata" src="output/audio/generated_03.wav"></audio>
+            <p class="caption">sampled at temp 0.9, top-k 12</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">IV</span>
+          <div class="track-body">
+            <h3>Piece IV</h3>
+            <audio controls preload="metadata" src="output/audio/generated_04.wav"></audio>
+            <p class="caption">sampled at temp 0.9, top-k 12</p>
+          </div>
+        </li>
+        <li>
+          <span class="num">V</span>
+          <div class="track-body">
+            <h3>Piece V</h3>
+            <audio controls preload="metadata" src="output/audio/generated_05.wav"></audio>
+            <p class="caption">sampled at temp 0.9, top-k 12</p>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="how">
+      <h2>How it's built</h2>
+      <p class="pipeline">MIDI → tokenizer → LSTM (NumPy) → sampler → MIDI + WAV</p>
+      <ul class="facts">
+        <li>28 procedurally generated MIDI files — classical and jazz</li>
+        <li>Single-layer LSTM with embedding, roughly 49K parameters</li>
+        <li>Trained with Adam and backpropagation through time, no ML framework</li>
+        <li>Audio rendered with additive sine-wave synthesis and ADSR envelopes</li>
+      </ul>
+    </section>
+
+    <footer>
+      <a href="https://github.com/shubhangi0227-cmyk/music-generation-ai">Source on GitHub</a>
+    </footer>
+
+  </div>
+</body>
+</html>
